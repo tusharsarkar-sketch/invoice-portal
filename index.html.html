@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Generator Portal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--navy:#0b2545;--navy2:#13315c;--accent:#2f6fed;--accent2:#1d4ed8;--bg:#f4f6f9;--card:#fff;--border:#e2e6ec;--text:#1c2733;--muted:#647184;--good:#1a8f5a;--bad:#c8372b;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);}
+#app{display:flex;min-height:100vh;}
+.sidebar{width:220px;background:linear-gradient(180deg,var(--navy),var(--navy2));color:#fff;flex-shrink:0;padding:18px 0;position:sticky;top:0;height:100vh;overflow:auto;}
+.sidebar h1{font-size:16px;padding:0 18px 14px;margin:0;border-bottom:1px solid rgba(255,255,255,.15);}
+.sidebar .navbtn{display:flex;align-items:center;gap:10px;padding:12px 18px;color:#cbd8ee;cursor:pointer;font-size:13.5px;font-weight:600;border-left:3px solid transparent;}
+.sidebar .navbtn:hover{background:rgba(255,255,255,.06);}
+.sidebar .navbtn.active{background:rgba(255,255,255,.1);color:#fff;border-left-color:var(--accent);}
+.main{flex:1;min-width:0;padding:20px 26px;}
+.view{display:none;}
+.view.active{display:block;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(20,30,60,.06);}
+.card h2{margin:0 0 14px;font-size:15px;color:var(--navy);}
+h1.page-title{color:var(--navy);font-size:22px;margin:0 0 4px;}
+p.page-sub{color:var(--muted);font-size:13px;margin:0 0 18px;}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:1100px){.grid4{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;border-left:4px solid var(--accent);}
+.stat .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.stat .val{font-size:22px;font-weight:700;color:var(--navy);margin-top:4px;}
+label{display:block;font-size:12px;font-weight:600;color:var(--navy2);margin:8px 0 4px;}
+input[type=text],input[type=number],input[type=date],input[type=email],textarea,select{width:100%;padding:8px 10px;border:1px solid #c7d0dd;border-radius:6px;font-size:13px;background:#fff;color:var(--text);font-family:inherit;}
+textarea{resize:vertical;min-height:56px;}
+.btn{display:inline-block;border:none;border-radius:7px;padding:9px 15px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--accent2);}
+.btn-outline{background:#fff;border:1px solid #c7d0dd;color:var(--navy2);}
+.btn-outline:hover{background:#eef2f8;}
+.btn-danger{background:#fff;border:1px solid #e6b3ae;color:var(--bad);}
+.btn-danger:hover{background:#fdecea;}
+.btn-big{padding:14px;font-size:15px;border-radius:9px;background:linear-gradient(90deg,var(--accent),var(--accent2));color:#fff;width:100%;}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+.typeSelector{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.typeSelector .topt{flex:1;min-width:140px;border:2px solid var(--border);border-radius:8px;padding:12px;text-align:center;cursor:pointer;font-weight:700;font-size:13px;color:var(--muted);background:#fafcff;}
+.typeSelector .topt.sel{border-color:var(--accent);color:var(--accent2);background:#eef4ff;}
+.itemsTable{width:100%;border-collapse:collapse;font-size:12.5px;}
+.itemsTable th{background:var(--navy);color:#fff;padding:7px 8px;text-align:left;}
+.itemsTable td{padding:5px 6px;border-bottom:1px solid #eee;}
+.itemsTable input{padding:5px 6px;font-size:12px;}
+.split{display:flex;gap:18px;align-items:flex-start;}
+.formCol{flex:1;min-width:340px;max-height:calc(100vh - 120px);overflow:auto;padding-right:6px;}
+.previewCol{flex:1;min-width:380px;position:sticky;top:20px;}
+.a4wrap{background:#e9edf3;padding:16px;border-radius:10px;max-height:calc(100vh - 60px);overflow:auto;}
+.a4{width:210mm;min-height:297mm;background:#fff;margin:0 auto;padding:14mm;font-family:Arial,Helvetica,sans-serif;color:#111;box-shadow:0 2px 10px rgba(0,0,0,.15);font-size:12.5px;}
+table{border-collapse:collapse;}
+.tablewrap{max-height:480px;overflow:auto;border:1px solid var(--border);border-radius:8px;}
+table.list{width:100%;font-size:13px;}
+table.list thead th{position:sticky;top:0;background:var(--navy);color:#fff;padding:9px 10px;text-align:left;}
+table.list tbody td{padding:8px 10px;border-bottom:1px solid #eef1f5;}
+table.list tbody tr:hover{background:#eef4ff;}
+.msg{padding:10px 14px;border-radius:7px;font-size:13.5px;margin-bottom:12px;}
+.msg.err{background:#fdecea;color:var(--bad);border:1px solid #f3c3bd;}
+.msg.ok{background:#e9f8ef;color:var(--good);border:1px solid #bfe9cf;}
+.hidden{display:none !important;}
+.tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+.tag.gst{background:#e6f0ff;color:#1d4ed8;}
+.tag.nongst{background:#fef3e0;color:#a15c00;}
+.tag.biometric{background:#e6f7f0;color:#0f7a4c;}
+.tag.frisking{background:#f3e8ff;color:#7c3aed;}
+.smallbtn{padding:4px 8px;font-size:11.5px;border-radius:5px;}
+@media print{
+  body *{visibility:hidden;}
+  #printArea, #printArea *{visibility:visible;}
+  #printArea{position:absolute;left:0;top:0;width:100%;}
+  .a4{box-shadow:none;margin:0;width:100%;min-height:0;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="sidebar">
+    <h1>📄 Invoice Portal</h1>
+    <div class="navbtn active" data-view="dashboard">🏠 Dashboard</div>
+    <div class="navbtn" data-view="create">➕ Create Invoice</div>
+    <div class="navbtn" data-view="history">🗂 Invoice History</div>
+    <div class="navbtn" data-view="settings">⚙ Settings</div>
+  </div>
+
+  <div class="main">
+    <div id="globalMsg"></div>
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-sub">Overview of all invoices generated</p>
+      <div class="grid4">
+        <div class="stat"><div class="lbl">Total Invoices</div><div class="val" id="statTotal">0</div></div>
+        <div class="stat"><div class="lbl">GST Invoices</div><div class="val" id="statGst">0</div></div>
+        <div class="stat"><div class="lbl">Non-GST Invoices</div><div class="val" id="statNonGst">0</div></div>
+        <div class="stat"><div class="lbl">Total Invoice Value</div><div class="val" id="statValue">₹0</div></div>
+      </div>
+      <div class="grid4" style="margin-top:14px;">
+        <div class="stat"><div class="lbl">Biometric Invoices</div><div class="val" id="statBio">0</div></div>
+        <div class="stat"><div class="lbl">Frisking Invoices</div><div class="val" id="statFrisk">0</div></div>
+      </div>
+      <div class="card" style="margin-top:18px;">
+        <h2>Recent Invoices</h2>
+        <div class="tablewrap"><table class="list" id="recentTable"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- CREATE -->
+    <div class="view" id="view-create">
+      <h1 class="page-title">Create Invoice</h1>
+      <p class="page-sub">Fill the details on the left, live preview updates on the right</p>
+
+      <div class="card">
+        <h2>Invoice Type</h2>
+        <div class="typeSelector" id="typeSelector">
+          <div class="topt sel" data-type="biometric">Biometric Invoice</div>
+          <div class="topt" data-type="frisking">Frisking Invoice</div>
+          <div class="topt" data-type="gst">GST Invoice</div>
+          <div class="topt" data-type="nongst">Non-GST Invoice</div>
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="formCol" id="formCol"></div>
+        <div class="previewCol">
+          <div class="row" style="margin-bottom:10px;">
+            <button class="btn btn-outline" id="changeTplBtn">🎨 Change Template</button>
+            <select id="tplSelect" style="width:auto;display:none;"></select>
+            <div style="flex:1;"></div>
+            <button class="btn btn-outline" id="downloadPdfBtn">⬇ PDF</button>
+            <button class="btn btn-outline" id="downloadExcelBtn">⬇ Excel</button>
+            <button class="btn btn-outline" id="printBtn">🖨 Print</button>
+          </div>
+          <div class="a4wrap"><div id="printArea"><div class="a4" id="previewArea"></div></div></div>
+          <button class="btn btn-big" id="createInvoiceBtn" style="margin-top:14px;">CREATE INVOICE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="view" id="view-history">
+      <h1 class="page-title">Invoice History</h1>
+      <p class="page-sub">All saved invoices (stored locally in your browser)</p>
+
+      <div class="card">
+        <h2>Bulk Upload Invoices (Excel)</h2>
+        <p style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">Upload an Excel file with "Invoice Master" (Vendor/Seller + invoice info) and "Invoice Items" sheets to generate multiple invoices at once — Seller details auto-fill from the file. Not sure of the format? Download the template first.</p>
+        <div class="row">
+          <button class="btn btn-outline" id="downloadTemplateBtn">⬇ Download Excel Template</button>
+          <button class="btn btn-primary" id="uploadExcelBtn">⬆ Upload Excel</button>
+          <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" class="hidden">
+        </div>
+        <div id="bulkUploadResult" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="margin-bottom:10px;">
+          <input type="text" id="historySearch" placeholder="🔍 Search invoices..." style="max-width:220px;">
+          <input type="date" id="filterUploadDate" title="Filter by Upload Date" style="max-width:170px;">
+          <input type="text" id="filterVendorCode" placeholder="Filter Vendor Code" style="max-width:160px;">
+          <select id="filterInvoiceType" style="max-width:150px;">
+            <option value="">All Types</option>
+            <option value="biometric">Biometric</option>
+            <option value="frisking">Frisking</option>
+            <option value="gst">GST</option>
+            <option value="nongst">Non-GST</option>
+          </select>
+          <input type="text" id="filterInvoiceNo" placeholder="Filter Invoice No" style="max-width:150px;">
+          <button class="btn btn-outline smallbtn" id="clearFiltersBtn">Clear Filters</button>
+        </div>
+        <div class="row" style="margin-bottom:10px;">
+          <button class="btn btn-primary" id="bulkDownloadBtn">⬇ Download Selected (ZIP)</button>
+          <span id="bulkSelCount" style="color:var(--muted);font-size:12.5px;align-self:center;">0 selected</span>
+          <span id="bulkDownloadProgress" style="color:var(--muted);font-size:12.5px;align-self:center;"></span>
+        </div>
+        <div class="tablewrap"><table class="list" id="historyTable"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <h1 class="page-title">Settings</h1>
+      <p class="page-sub">Seller / company details reused across all invoices</p>
+      <div class="card">
+        <h2>Company / Seller Details</h2>
+        <div class="grid2">
+          <div>
+            <label>Company / Seller Name</label><input type="text" id="s_companyName">
+            <label>Address (multi-line)</label><textarea id="s_address"></textarea>
+            <label>GSTIN</label><input type="text" id="s_gstin">
+            <label>PAN</label><input type="text" id="s_pan">
+            <label>Email</label><input type="email" id="s_email">
+            <label>Phone</label><input type="text" id="s_phone">
+          </div>
+          <div>
+            <label>Bank Name</label><input type="text" id="s_bankName">
+            <label>Account Number</label><input type="text" id="s_accountNumber">
+            <label>IFSC</label><input type="text" id="s_ifsc">
+            <label>Branch</label><input type="text" id="s_branch">
+            <label>Company Logo</label><input type="file" id="s_logoFile" accept="image/*">
+            <img id="s_logoPreview" style="max-height:60px;margin-top:6px;display:none;">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Biometric / Frisking Invoice Defaults</h2>
+        <div class="grid2">
+          <div>
+            <label>MSME Line 1</label><input type="text" id="s_msme1" value="MSME Registered - No">
+            <label>MSME Line 2 (optional)</label><input type="text" id="s_msme2" placeholder="e.g. MSME Registration – No">
+            <label>Beneficiary Name</label><input type="text" id="s_beneficiary">
+          </div>
+          <div>
+            <label>Show PAN in header block</label>
+            <select id="s_showPanHeader"><option value="no">No</option><option value="yes">Yes</option></select>
+            <label>Signature Image</label><input type="file" id="s_sigFile" accept="image/*">
+            <img id="s_sigPreview" style="max-height:60px;margin-top:6px;display:none;">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>GST / Invoice Numbering Defaults</h2>
+        <div class="grid2">
+          <div>
+            <label>Invoice Prefix</label><input type="text" id="s_prefix" placeholder="INV-">
+            <label>Starting Invoice Number</label><input type="number" id="s_startNum" value="1">
+          </div>
+          <div>
+            <label>Default GST %</label><input type="number" id="s_defGst" value="18">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Vendor Master (Optional)</h2>
+        <p style="font-size:12.5px;color:var(--muted);margin:-4px 0 12px;">Vendor details from Excel uploads can be remembered by Vendor Code for future uploads.</p>
+        <div class="row" style="margin-bottom:10px;">
+          <button class="btn btn-primary" id="uploadVendorBtn">⬆ Upload Vendor Master</button>
+          <button class="btn btn-outline" id="downloadVendorTemplateBtn">⬇ Download Vendor Master Template</button>
+          <button class="btn btn-outline" id="exportVendorBtn">⬇ Export Vendor Master</button>
+          <button class="btn btn-danger" id="clearVendorBtn">🗑 Clear Vendor Master</button>
+          <input type="file" id="vendorFileInput" accept=".xlsx,.xls" class="hidden">
+        </div>
+        <div id="vendorImportResult"></div>
+        <input type="text" id="vendorSearch" placeholder="🔍 Search Vendor Code / Vendor Name" style="max-width:280px;margin-bottom:10px;">
+        <div class="tablewrap"><table class="list" id="vendorTable"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const LS_SETTINGS='ipg_settings', LS_HISTORY='ipg_history', LS_TPL='ipg_tpl_counter', LS_LASTBUYER='ipg_last_buyer', LS_COUNTERS='ipg_counters';
+const DEFAULT_BUYER = {
+  name: 'Innovatiview India Limited',
+  address: 'Khasra no. 85/4, Gali no. 6, Industrial area Mundka, West Delhi \u2013 110041.',
+  gstin: '07AAECI6465J1Z8',
+  pan: '',
+  state: 'Delhi',
+  stateCode: '07',
+  contact: '9289938566',
+  email: 'Invoice@innovatiview.com'
+};
+function el(id){return document.getElementById(id);}
+function uid(){return 'inv_'+Date.now()+'_'+Math.floor(Math.random()*10000);}
+function showMsg(t,type){el('globalMsg').innerHTML='<div class="msg '+(type==='err'?'err':'ok')+'">'+t+'</div>';setTimeout(()=>el('globalMsg').innerHTML='',5000);}
+function fmt(n){n=Number(n)||0;return n.toLocaleString('en-IN',{maximumFractionDigits:2});}
+function fmtMoney(n){return '₹'+fmt(n);}
+function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function nl2br(s){return escapeHtml(s).replace(/\n/g,'<br>');}
+
+// ---------- Number to Indian words ----------
+const ONES=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+const TENS=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+function twoDigits(n){ if(n<20) return ONES[n]; return TENS[Math.floor(n/10)]+(n%10?' '+ONES[n%10]:''); }
+function threeDigits(n){ let s=''; if(n>=100){ s+=ONES[Math.floor(n/100)]+' Hundred'; n=n%100; if(n) s+=' '; } if(n>0) s+=twoDigits(n); return s; }
+function numToWordsIndian(num){
+  num=Math.round(num);
+  if(num===0) return 'Zero';
+  let crore=Math.floor(num/10000000); num%=10000000;
+  let lakh=Math.floor(num/100000); num%=100000;
+  let thousand=Math.floor(num/1000); num%=1000;
+  let rest=num;
+  let parts=[];
+  if(crore) parts.push(threeDigits(crore)+' Crore');
+  if(lakh) parts.push(threeDigits(lakh)+' Lakh');
+  if(thousand) parts.push(threeDigits(thousand)+' Thousand');
+  if(rest) parts.push(threeDigits(rest));
+  return parts.join(' ');
+}
+function amountInWords(n){ return 'Rupees '+numToWordsIndian(n)+' Only'; }
+
+// ---------- Settings ----------
+function loadSettings(){
+  const def={companyName:'',address:'',gstin:'',pan:'',email:'',phone:'',bankName:'',accountNumber:'',ifsc:'',branch:'',logo:'',msme1:'MSME Registered - No',msme2:'',beneficiary:'',showPanHeader:'no',signature:'',prefix:'INV-',startNum:1,defGst:18};
+  try{ const s=JSON.parse(localStorage.getItem(LS_SETTINGS)||'{}'); return Object.assign(def,s); }catch(e){ return def; }
+}
+function saveSettingsObj(s){ localStorage.setItem(LS_SETTINGS, JSON.stringify(s)); }
+let settings = loadSettings();
+
+function fillSettingsForm(){
+  el('s_companyName').value=settings.companyName; el('s_address').value=settings.address;
+  el('s_gstin').value=settings.gstin; el('s_pan').value=settings.pan; el('s_email').value=settings.email; el('s_phone').value=settings.phone;
+  el('s_bankName').value=settings.bankName; el('s_accountNumber').value=settings.accountNumber; el('s_ifsc').value=settings.ifsc; el('s_branch').value=settings.branch;
+  el('s_msme1').value=settings.msme1; el('s_msme2').value=settings.msme2; el('s_beneficiary').value=settings.beneficiary;
+  el('s_showPanHeader').value=settings.showPanHeader;
+  el('s_prefix').value=settings.prefix; el('s_startNum').value=settings.startNum; el('s_defGst').value=settings.defGst;
+  if(settings.logo){ el('s_logoPreview').src=settings.logo; el('s_logoPreview').style.display='inline-block'; }
+  if(settings.signature){ el('s_sigPreview').src=settings.signature; el('s_sigPreview').style.display='inline-block'; }
+}
+function readFileAsDataURL(file, cb){ const r=new FileReader(); r.onload=e=>cb(e.target.result); r.readAsDataURL(file); }
+el('s_logoFile').addEventListener('change', e=>{ if(e.target.files[0]) readFileAsDataURL(e.target.files[0], url=>{ settings.logo=url; el('s_logoPreview').src=url; el('s_logoPreview').style.display='inline-block'; }); });
+el('s_sigFile').addEventListener('change', e=>{ if(e.target.files[0]) readFileAsDataURL(e.target.files[0], url=>{ settings.signature=url; el('s_sigPreview').src=url; el('s_sigPreview').style.display='inline-block'; }); });
+
+el('saveSettingsBtn').addEventListener('click', ()=>{
+  settings.companyName=el('s_companyName').value; settings.address=el('s_address').value;
+  settings.gstin=el('s_gstin').value; settings.pan=el('s_pan').value; settings.email=el('s_email').value; settings.phone=el('s_phone').value;
+  settings.bankName=el('s_bankName').value; settings.accountNumber=el('s_accountNumber').value; settings.ifsc=el('s_ifsc').value; settings.branch=el('s_branch').value;
+  settings.msme1=el('s_msme1').value; settings.msme2=el('s_msme2').value; settings.beneficiary=el('s_beneficiary').value;
+  settings.showPanHeader=el('s_showPanHeader').value;
+  settings.prefix=el('s_prefix').value; settings.startNum=parseInt(el('s_startNum').value)||1; settings.defGst=parseFloat(el('s_defGst').value)||18;
+  saveSettingsObj(settings);
+  showMsg('Settings saved successfully.','ok');
+});
+fillSettingsForm();
+
+// ---------- Vendor Master (Optional) ----------
+const LS_VENDORS='ipg_vendor_master';
+function loadVendors(){ try{ return JSON.parse(localStorage.getItem(LS_VENDORS)||'[]'); }catch(e){ return []; } }
+function saveVendors(v){ localStorage.setItem(LS_VENDORS, JSON.stringify(v)); }
+let vendors_ = loadVendors();
+
+function renderVendorTable(){
+  const q = (el('vendorSearch').value||'').trim().toLowerCase();
+  const rows = vendors_.filter(v=> !q || (String(v.vendorCode||'')+' '+String(v.vendorName||'')).toLowerCase().includes(q));
+  const thead = '<tr><th>Vendor Code</th><th>Vendor Name</th><th>Mobile</th><th>Email</th><th>GST No.</th><th>Bank</th><th>IFSC</th></tr>';
+  const tbody = rows.map(v=>'<tr><td>'+escapeHtml(v.vendorCode)+'</td><td>'+escapeHtml(v.vendorName)+'</td><td>'+escapeHtml(v.mobile)+'</td><td>'+escapeHtml(v.email)+'</td><td>'+escapeHtml(v.gstNo)+'</td><td>'+escapeHtml(v.bankName)+'</td><td>'+escapeHtml(v.ifsc)+'</td></tr>').join('');
+  el('vendorTable').innerHTML = '<thead>'+thead+'</thead><tbody>'+(tbody||'<tr><td colspan="7" style="text-align:center;color:var(--muted);">No vendor records yet.</td></tr>')+'</tbody>';
+}
+el('vendorSearch').addEventListener('input', renderVendorTable);
+
+el('uploadVendorBtn').addEventListener('click', ()=> el('vendorFileInput').click());
+el('vendorFileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rowsRaw = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      processVendorImport(rowsRaw);
+    }catch(err){
+      renderVendorImportResult({added:0,updated:0,skipped:0,errors:['Could not read the Excel file: '+err.message]});
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value='';
+});
+
+function processVendorImport(rowsRaw){
+  let added=0, updated=0, skipped=0; const errors=[];
+  const byCode = {}; vendors_.forEach(v=> byCode[String(v.vendorCode).trim().toUpperCase()] = v);
+  rowsRaw.forEach((raw, idx)=>{
+    const rowNum = idx+2;
+    const isBlankRow = Object.values(raw).every(val=> String(val==null?'':val).trim()==='');
+    if(isBlankRow) return;
+    const r = normalizeRowKeys(raw);
+    const vendorCode = String(r.vendorcode||'').trim();
+    if(!vendorCode){ errors.push('Row '+rowNum+': Vendor Code is missing. Skipped.'); skipped++; return; }
+    const rec = {
+      vendorCode: vendorCode,
+      vendorName: String(r.vendorname||'').trim(),
+      address: String(r.address||'').trim(),
+      mobile: String(r.mobno||'').trim(),
+      email: String(r.email||'').trim(),
+      msme: String(r.msmeregistered||'').trim(),
+      gstNo: String(r.gstno||'').trim(),
+      pan: String(r.pan||'').trim(),
+      beneficiary: String(r.beneficiaryname||'').trim(),
+      bankName: String(r.bankname||'').trim(),
+      accountNo: String(r.accountno||'').trim(),
+      ifsc: String(r.ifsc||'').trim()
+    };
+    const key = vendorCode.toUpperCase();
+    if(byCode[key]){ Object.assign(byCode[key], rec); updated++; }
+    else { vendors_.push(rec); byCode[key]=rec; added++; }
+  });
+  saveVendors(vendors_);
+  renderVendorTable();
+  renderVendorImportResult({added, updated, skipped, errors});
+}
+
+function renderVendorImportResult(res){
+  const box = el('vendorImportResult');
+  let html = '<div class="msg '+(res.errors.length?'err':'ok')+'"><b>Vendor Master Import Complete</b><br>Added: '+res.added+'&nbsp;&nbsp; Updated: '+res.updated+'&nbsp;&nbsp; Skipped: '+res.skipped+'&nbsp;&nbsp; Errors: '+res.errors.length+'</div>';
+  if(res.errors.length){ html += '<div class="msg err"><ul style="margin:8px 0 0 18px;padding:0;">'+res.errors.map(e=>'<li>'+escapeHtml(e)+'</li>').join('')+'</ul></div>'; }
+  box.innerHTML = html;
+}
+
+const VENDOR_TEMPLATE_HEAD = ['Vendor Code','Vendor Name','Address','Mob No.','E-Mail','MSME Registered','GST No.','PAN','Beneficiary Name','BANK NAME','ACCOUNT NO','IFSC'];
+el('downloadVendorTemplateBtn').addEventListener('click', ()=>{
+  const wb = XLSX.utils.book_new();
+  const rows = [VENDOR_TEMPLATE_HEAD, ['V001','MISS MURSHIDA','D/O Sanaulla, Ottupara, Mampatta, Kerala Estate Village, Karuvarakundu, Tharis, Malappuram - 676523','7976649497','ansarikvk66@gmail.com','No','','RYQPS0458M','MISS MURSHIDA','THE FEDERAL BANK LTD','16300100046768','FDRL0001630']];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Vendor Master');
+  XLSX.writeFile(wb, 'Vendor_Master_Template.xlsx');
+});
+
+el('exportVendorBtn').addEventListener('click', ()=>{
+  if(vendors_.length===0){ showMsg('No vendor records to export.','err'); return; }
+  const wb = XLSX.utils.book_new();
+  const rows = [VENDOR_TEMPLATE_HEAD].concat(vendors_.map(v=>[v.vendorCode,v.vendorName,v.address,v.mobile,v.email,v.msme,v.gstNo,v.pan,v.beneficiary,v.bankName,v.accountNo,v.ifsc]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Vendor Master');
+  XLSX.writeFile(wb, 'Vendor_Master_Export.xlsx');
+});
+
+el('clearVendorBtn').addEventListener('click', ()=>{
+  if(vendors_.length===0){ showMsg('Vendor Master is already empty.','ok'); return; }
+  if(!confirm('Clear all Vendor Master records? This cannot be undone.')) return;
+  vendors_ = []; saveVendors(vendors_); renderVendorTable(); el('vendorImportResult').innerHTML='';
+  showMsg('Vendor Master cleared.','ok');
+});
+renderVendorTable();
+
+// ---------- History ----------
+function loadHistory(){ try{ return JSON.parse(localStorage.getItem(LS_HISTORY)||'[]'); }catch(e){ return []; } }
+function saveHistory(h){ localStorage.setItem(LS_HISTORY, JSON.stringify(h)); }
+let history_ = loadHistory();
+
+function nextCounter(type){
+  let c={}; try{ c=JSON.parse(localStorage.getItem(LS_COUNTERS)||'{}'); }catch(e){}
+  const cur = c[type] || (type==='gst'||type==='nongst' ? settings.startNum : 1);
+  return cur;
+}
+function bumpCounter(type, usedVal){
+  let c={}; try{ c=JSON.parse(localStorage.getItem(LS_COUNTERS)||'{}'); }catch(e){}
+  c[type] = (parseInt(usedVal)||0) + 1;
+  localStorage.setItem(LS_COUNTERS, JSON.stringify(c));
+}
+
+// ---------- Navigation ----------
+document.querySelectorAll('.navbtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.navbtn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    el('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view==='dashboard') renderDashboard();
+    if(btn.dataset.view==='history') renderHistory();
+  });
+});
+
+// ---------- Invoice Type ----------
+let currentType='biometric';
+document.querySelectorAll('#typeSelector .topt').forEach(opt=>{
+  opt.addEventListener('click', ()=>{
+    document.querySelectorAll('#typeSelector .topt').forEach(o=>o.classList.remove('sel'));
+    opt.classList.add('sel');
+    currentType = opt.dataset.type;
+    buildForm();
+    renderPreview();
+  });
+});
+
+// ---------- Templates (GST / Non-GST rotate through 8 designs) ----------
+const TEMPLATES=[
+  {name:'Corporate Blue', head:'#1d4ed8', accent:'#eaf1ff', font:'Arial, sans-serif'},
+  {name:'Modern Minimal', head:'#111827', accent:'#f3f4f6', font:'Helvetica, Arial, sans-serif'},
+  {name:'Professional Dark', head:'#0b2545', accent:'#e5e9f2', font:'Georgia, serif'},
+  {name:'Classic', head:'#7a1f1f', accent:'#fbeaea', font:'Times New Roman, serif'},
+  {name:'Clean Business', head:'#0f7a4c', accent:'#e9f8ef', font:'Verdana, sans-serif'},
+  {name:'Elegant', head:'#5b21b6', accent:'#f3e8ff', font:'Georgia, serif'},
+  {name:'Compact', head:'#374151', accent:'#f1f5f9', font:'Arial, sans-serif'},
+  {name:'Modern GST', head:'#a15c00', accent:'#fef3e0', font:'Trebuchet MS, sans-serif'}
+];
+function getTplCounter(){ return parseInt(localStorage.getItem(LS_TPL)||'0'); }
+function setTplCounter(v){ localStorage.setItem(LS_TPL, String(v)); }
+let manualTplIndex = null;
+
+el('changeTplBtn').addEventListener('click', ()=>{
+  const sel = el('tplSelect');
+  if(sel.style.display==='none'){
+    sel.innerHTML = TEMPLATES.map((t,i)=>'<option value="'+i+'">'+(i+1)+'. '+t.name+'</option>').join('');
+    sel.value = manualTplIndex!==null?manualTplIndex:getTplCounter()%8;
+    sel.style.display='inline-block';
+  } else { sel.style.display='none'; }
+});
+el('tplSelect').addEventListener('change', e=>{ manualTplIndex=parseInt(e.target.value); renderPreview(); });
+
+// ---------- Item rows ----------
+let items=[]; // current draft items
+function blankItemSvc(){ return {desc:'',hsn:'',qty:1,rate:0}; }
+function blankItemGst(){ return {desc:'',hsn:'',qty:1,unit:'Nos',rate:0,discount:0,gst:settings.defGst}; }
+
+function addItem(){
+  items.push(currentType==='gst'||currentType==='nongst' ? blankItemGst() : blankItemSvc());
+  renderItemsTable();
+}
+function removeItem(idx){ items.splice(idx,1); renderItemsTable(); }
+
+function renderItemsTable(){
+  const box = el('itemsBox');
+  if(!box) return;
+  const isSvc = currentType==='biometric'||currentType==='frisking';
+  let html = '<table class="itemsTable"><thead><tr>';
+  if(isSvc){
+    html += '<th>Description</th><th>HSN/SAC</th><th>Qty</th><th>Rate</th><th>Total</th><th></th>';
+  } else {
+    html += '<th>Description</th><th>HSN</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Disc</th>';
+    if(currentType==='gst') html += '<th>GST%</th>';
+    html += '<th>Total</th><th></th>';
+  }
+  html += '</tr></thead><tbody>';
+  items.forEach((it,i)=>{
+    if(isSvc){
+      const total = (parseFloat(it.qty)||0)*(parseFloat(it.rate)||0);
+      html += '<tr>'+
+        '<td><input type="text" data-i="'+i+'" data-f="desc" value="'+escapeHtml(it.desc)+'"></td>'+
+        '<td><input type="text" data-i="'+i+'" data-f="hsn" value="'+escapeHtml(it.hsn)+'" style="width:70px;"></td>'+
+        '<td><input type="number" data-i="'+i+'" data-f="qty" value="'+it.qty+'" style="width:55px;"></td>'+
+        '<td><input type="number" data-i="'+i+'" data-f="rate" value="'+it.rate+'" style="width:70px;"></td>'+
+        '<td style="text-align:right;font-weight:600;">'+fmt(total)+'</td>'+
+        '<td><button class="btn btn-danger smallbtn" data-rm="'+i+'">✕</button></td></tr>';
+    } else {
+      const taxable = ((parseFloat(it.qty)||0)*(parseFloat(it.rate)||0)) - (parseFloat(it.discount)||0);
+      const total = currentType==='gst' ? taxable + taxable*(parseFloat(it.gst)||0)/100 : taxable;
+      html += '<tr>'+
+        '<td><input type="text" data-i="'+i+'" data-f="desc" value="'+escapeHtml(it.desc)+'" style="width:110px;"></td>'+
+        '<td><input type="text" data-i="'+i+'" data-f="hsn" value="'+escapeHtml(it.hsn)+'" style="width:55px;"></td>'+
+        '<td><input type="number" data-i="'+i+'" data-f="qty" value="'+it.qty+'" style="width:45px;"></td>'+
+        '<td><input type="text" data-i="'+i+'" data-f="unit" value="'+escapeHtml(it.unit)+'" style="width:45px;"></td>'+
+        '<td><input type="number" data-i="'+i+'" data-f="rate" value="'+it.rate+'" style="width:60px;"></td>'+
+        '<td><input type="number" data-i="'+i+'" data-f="discount" value="'+it.discount+'" style="width:50px;"></td>'+
+        (currentType==='gst' ? '<td><input type="number" data-i="'+i+'" data-f="gst" value="'+it.gst+'" style="width:45px;"></td>' : '')+
+        '<td style="text-align:right;font-weight:600;">'+fmt(total)+'</td>'+
+        '<td><button class="btn btn-danger smallbtn" data-rm="'+i+'">✕</button></td></tr>';
+    }
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+  box.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const i=parseInt(inp.dataset.i), f=inp.dataset.f;
+      items[i][f] = (f==='qty'||f==='rate'||f==='discount'||f==='gst') ? parseFloat(inp.value)||0 : inp.value;
+      renderItemsTable();
+      renderPreview();
+    });
+  });
+  box.querySelectorAll('[data-rm]').forEach(b=>{
+    b.addEventListener('click', ()=>{ removeItem(parseInt(b.dataset.rm)); renderPreview(); });
+  });
+}
+
+// ---------- Build Form ----------
+function buildForm(){
+  const isSvc = currentType==='biometric'||currentType==='frisking';
+  const isGstType = currentType==='gst';
+  const col = el('formCol');
+  const nextNum = (settings.prefix||'') + nextCounter(currentType);
+
+  let html = '<div class="card"><h2>Invoice Details</h2>';
+  html += '<label>Invoice Number</label><input type="text" id="f_invNo" value="'+escapeHtml(isSvc? String(nextCounter(currentType)) : nextNum)+'">';
+  html += '<label>Invoice Date</label><input type="date" id="f_invDate" value="'+new Date().toISOString().slice(0,10)+'">';
+  if(!isSvc){
+    html += '<label>Due Date</label><input type="date" id="f_dueDate">';
+    html += '<label>Place of Supply</label><input type="text" id="f_placeSupply">';
+    html += '<label>Reverse Charge</label><select id="f_reverse"><option value="No">No</option><option value="Yes">Yes</option></select>';
+  } else {
+    html += '<label>'+(currentType==='biometric'?'PO/Project id':'Project id')+'</label><input type="text" id="f_projectId" placeholder="e.g. REIL/4TH-GRD/190925/BIOMETRIC/IIL">';
+    html += '<label>Category / Service Label</label><input type="text" id="f_categoryLabel" value="'+(currentType==='biometric'?'Biometric Services with Device':'Frisking Services with HHMD')+'">';
+  }
+  html += '</div>';
+
+  html += '<div class="card"><h2>Seller Details</h2>';
+  html += '<label>Name / Company</label><input type="text" id="f_sellerName" value="'+escapeHtml(settings.companyName)+'">';
+  html += '<label>Address</label><textarea id="f_sellerAddress">'+escapeHtml(settings.address)+'</textarea>';
+  if(isGstType || currentType==='nongst'){
+    html += '<label>GSTIN</label><input type="text" id="f_sellerGstin" value="'+escapeHtml(settings.gstin)+'">';
+  }
+  html += '<label>PAN</label><input type="text" id="f_sellerPan" value="'+escapeHtml(settings.pan)+'">';
+  html += '<label>Email</label><input type="text" id="f_sellerEmail" value="'+escapeHtml(settings.email)+'">';
+  html += '<label>Phone</label><input type="text" id="f_sellerPhone" value="'+escapeHtml(settings.phone)+'">';
+  if(isSvc){
+    html += '<label>MSME Line 1</label><input type="text" id="f_msme1" value="'+escapeHtml(settings.msme1)+'">';
+    html += '<label>MSME Line 2 (optional)</label><input type="text" id="f_msme2" value="'+escapeHtml(settings.msme2)+'">';
+  }
+  html += '</div>';
+
+  html += '<div class="card"><h2>Bill To / Customer Details</h2>';
+  const lb = getLastBuyer();
+  html += '<label>Customer / Company Name</label><input type="text" id="f_buyerName" value="'+escapeHtml(lb.name)+'">';
+  html += '<label>Address</label><textarea id="f_buyerAddress">'+escapeHtml(lb.address)+'</textarea>';
+  html += '<label>GSTIN</label><input type="text" id="f_buyerGstin" value="'+escapeHtml(lb.gstin)+'">';
+  if(isGstType || currentType==='nongst'){ html += '<label>PAN</label><input type="text" id="f_buyerPan" value="'+escapeHtml(lb.pan||'')+'">'; }
+  html += '<div class="grid2"><div><label>State Name</label><input type="text" id="f_buyerState" value="'+escapeHtml(lb.state)+'"></div><div><label>State Code</label><input type="text" id="f_buyerStateCode" value="'+escapeHtml(lb.stateCode)+'"></div></div>';
+  html += '<label>Contact No</label><input type="text" id="f_buyerContact" value="'+escapeHtml(lb.contact)+'">';
+  html += '<label>Email</label><input type="text" id="f_buyerEmail" value="'+escapeHtml(lb.email)+'">';
+  html += '</div>';
+
+  if(isGstType){
+    html += '<div class="card"><h2>GST Type</h2><select id="f_gstMode"><option value="auto">Auto (compare state codes)</option><option value="intra">Intra-State (CGST+SGST)</option><option value="inter">Inter-State (IGST)</option></select></div>';
+  }
+
+  html += '<div class="card"><h2>Items</h2><div id="itemsBox"></div><button class="btn btn-outline" id="addItemBtn" style="margin-top:8px;">+ Add Item</button>';
+  if(isSvc){ html += '<label style="margin-top:10px;">Discount (single amount, optional)</label><input type="number" id="f_discountSvc" value="0">'; }
+  html += '</div>';
+
+  if(isSvc){
+    html += '<div class="card"><h2>Bank / Beneficiary Details</h2>';
+    html += '<label>Beneficiary Name</label><input type="text" id="f_beneficiary" value="'+escapeHtml(settings.beneficiary||settings.companyName)+'">';
+    html += '<label>Bank Name</label><input type="text" id="f_bankName" value="'+escapeHtml(settings.bankName)+'">';
+    html += '<label>Account Number</label><input type="text" id="f_accountNumber" value="'+escapeHtml(settings.accountNumber)+'">';
+    html += '<label>IFSC Code</label><input type="text" id="f_ifsc" value="'+escapeHtml(settings.ifsc)+'">';
+    html += '<label>PAN No (bottom)</label><input type="text" id="f_bottomPan" value="'+escapeHtml(settings.pan)+'">';
+    html += '</div>';
+  } else {
+    html += '<div class="card"><h2>Bank Details</h2>';
+    html += '<div class="grid2"><div><label>Bank Name</label><input type="text" id="f_bankName" value="'+escapeHtml(settings.bankName)+'"></div><div><label>Account Number</label><input type="text" id="f_accountNumber" value="'+escapeHtml(settings.accountNumber)+'"></div></div>';
+    html += '<div class="grid2"><div><label>IFSC</label><input type="text" id="f_ifsc" value="'+escapeHtml(settings.ifsc)+'"></div><div><label>Branch</label><input type="text" id="f_branch" value="'+escapeHtml(settings.branch)+'"></div></div>';
+    html += '</div>';
+    html += '<div class="card"><h2>Notes / Terms</h2>';
+    html += '<label>Notes</label><textarea id="f_notes"></textarea>';
+    html += '<label>Terms & Conditions</label><textarea id="f_terms"></textarea>';
+    html += '<label>Payment Terms</label><textarea id="f_paymentTerms"></textarea>';
+    html += '</div>';
+  }
+
+  html += '<div class="card"><h2>Logo / Signature</h2>';
+  html += '<label>Logo (this invoice)</label><input type="file" id="f_logoFile" accept="image/*">';
+  if(isSvc){ html += '<label>Signature (this invoice)</label><input type="file" id="f_sigFile" accept="image/*">'; }
+  html += '</div>';
+
+  col.innerHTML = html;
+  items = [blankItemSvc()];
+  if(!isSvc) items=[blankItemGst()];
+  renderItemsTable();
+
+  el('addItemBtn').addEventListener('click', addItem);
+  col.querySelectorAll('input,textarea,select').forEach(f=> f.addEventListener('input', renderPreview));
+  const logoFile = el('f_logoFile'); if(logoFile) logoFile.addEventListener('change', e=>{ if(e.target.files[0]) readFileAsDataURL(e.target.files[0], url=>{ draftLogo=url; renderPreview(); }); });
+  const sigFile = el('f_sigFile'); if(sigFile) sigFile.addEventListener('change', e=>{ if(e.target.files[0]) readFileAsDataURL(e.target.files[0], url=>{ draftSig=url; renderPreview(); }); });
+}
+let draftLogo='', draftSig=settings.signature||'';
+
+function getLastBuyer(){
+  let stored = {};
+  try{ stored = JSON.parse(localStorage.getItem(LS_LASTBUYER)||'{}'); }catch(e){ stored = {}; }
+  return { ...DEFAULT_BUYER, ...stored };
+}
+
+// ---------- Gather form data ----------
+function gatherData(){
+  const isSvc = currentType==='biometric'||currentType==='frisking';
+  const d = { type: currentType, invoiceNumber: el('f_invNo').value, invoiceDate: el('f_invDate').value };
+  d.seller = { name:el('f_sellerName').value, address:el('f_sellerAddress').value, pan:el('f_sellerPan').value, email:el('f_sellerEmail').value, phone:el('f_sellerPhone').value };
+  d.buyer = { name:el('f_buyerName').value, address:el('f_buyerAddress').value, gstin:el('f_buyerGstin').value, state:el('f_buyerState').value, stateCode:el('f_buyerStateCode').value, contact:el('f_buyerContact').value, email:el('f_buyerEmail').value };
+  if(!isSvc){
+    d.dueDate = el('f_dueDate').value; d.placeSupply = el('f_placeSupply').value; d.reverseCharge = el('f_reverse').value;
+    d.seller.gstin = el('f_sellerGstin').value;
+    d.buyer.pan = el('f_buyerPan') ? el('f_buyerPan').value : '';
+    d.bankName = el('f_bankName').value; d.accountNumber = el('f_accountNumber').value; d.ifsc = el('f_ifsc').value; d.branch = el('f_branch').value;
+    d.notes = el('f_notes').value; d.terms = el('f_terms').value; d.paymentTerms = el('f_paymentTerms').value;
+    if(currentType==='gst') d.gstMode = el('f_gstMode').value;
+  } else {
+    d.projectId = el('f_projectId').value; d.categoryLabel = el('f_categoryLabel').value;
+    d.seller.msme1 = el('f_msme1').value; d.seller.msme2 = el('f_msme2').value;
+    d.beneficiary = el('f_beneficiary').value; d.bankName = el('f_bankName').value; d.accountNumber = el('f_accountNumber').value; d.ifsc = el('f_ifsc').value; d.bottomPan = el('f_bottomPan').value;
+    d.discount = parseFloat(el('f_discountSvc').value)||0;
+  }
+  d.items = JSON.parse(JSON.stringify(items));
+  d.logo = draftLogo || settings.logo || '';
+  d.signature = draftSig || settings.signature || '';
+  return d;
+}
+
+// ---------- Calculations ----------
+function calcTotals(d){
+  const isSvc = d.type==='biometric'||d.type==='frisking';
+  if(isSvc){
+    let sum=0;
+    d.itemsCalc = d.items.map(it=>{ const total=(parseFloat(it.qty)||0)*(parseFloat(it.rate)||0); sum+=total; return Object.assign({},it,{total}); });
+    d.grandTotal = sum - (parseFloat(d.discount)||0);
+    d.amountWords = amountInWords(d.grandTotal);
+    return d;
+  }
+  const sellerCode = (d.seller.gstin||'').substring(0,2);
+  let intra = true;
+  if(d.type==='gst'){
+    if(d.gstMode==='intra') intra=true; else if(d.gstMode==='inter') intra=false; else intra = sellerCode && d.buyer.stateCode ? (sellerCode===d.buyer.stateCode) : true;
+  }
+  let subtotal=0, discTot=0, taxable=0, cgst=0, sgst=0, igst=0, grand=0;
+  d.itemsCalc = d.items.map(it=>{
+    const qty=parseFloat(it.qty)||0, rate=parseFloat(it.rate)||0, disc=parseFloat(it.discount)||0;
+    const gross = qty*rate;
+    const tax = gross - disc;
+    let c=0,s=0,ig=0;
+    if(d.type==='gst'){
+      const pct = parseFloat(it.gst)||0;
+      if(intra){ c = tax*pct/200; s = tax*pct/200; } else { ig = tax*pct/100; }
+    }
+    const total = tax + c + s + ig;
+    subtotal+=gross; discTot+=disc; taxable+=tax; cgst+=c; sgst+=s; igst+=ig; grand+=total;
+    return Object.assign({},it,{gross,tax,cgst:c,sgst:s,igst:ig,total});
+  });
+  d.subtotal=subtotal; d.discountTotal=discTot; d.taxable=taxable; d.cgst=cgst; d.sgst=sgst; d.igst=igst; d.grandTotal=grand; d.intra=intra;
+  d.amountWords = amountInWords(grand);
+  return d;
+}
+
+// ---------- Render Preview ----------
+function currentTemplateIndex(){ return manualTplIndex!==null ? manualTplIndex : getTplCounter()%8; }
+
+function renderPreview(){
+  if(!el('f_invNo')) return;
+  let d = gatherData();
+  d = calcTotals(d);
+  const html = (d.type==='biometric'||d.type==='frisking') ? renderServiceInvoice(d) : renderGstInvoice(d, TEMPLATES[currentTemplateIndex()]);
+  el('previewArea').innerHTML = html;
+}
+
+function renderServiceInvoice(d){
+  const s=d.seller, b=d.buyer;
+  const projLabel = d.type==='biometric' ? 'PO/Project id' : 'Project id';
+  let rows='';
+  rows += '<tr><td></td><td style="font-style:italic;font-weight:600;">'+escapeHtml(d.categoryLabel||'')+'</td><td></td><td></td><td></td></tr>';
+  d.itemsCalc.forEach((it,i)=>{
+    rows += '<tr><td>'+(i+1)+'</td><td>'+escapeHtml(it.desc)+'</td><td>'+escapeHtml(it.hsn)+'</td><td>'+fmt(it.qty)+'</td><td>'+fmt(it.rate)+'</td><td style="font-weight:600;">'+fmt(it.total)+'</td></tr>';
+  });
+  if(d.discount){ rows += '<tr><td></td><td>Discount</td><td></td><td></td><td></td><td>'+fmt(d.discount)+'</td></tr>'; }
+  rows += '<tr><td colspan="4"></td><td style="font-weight:700;">Total Amount</td><td style="font-weight:700;">'+fmt(d.grandTotal)+'</td></tr>';
+
+  return '<div style="font-family:Arial,sans-serif;">'+
+  '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
+    '<div>'+
+      '<div style="font-size:18px;font-weight:700;">'+escapeHtml(s.name)+'</div>'+
+      '<div style="margin-top:8px;line-height:1.5;">'+nl2br(s.address)+'</div>'+
+      (d.type==='frisking' && settings.showPanHeader==='yes' ? '<div>Pan No- '+escapeHtml(s.pan)+'</div>' : '')+
+      '<div>Contact No _ '+escapeHtml(s.phone)+'</div>'+
+      '<div>Email Id_ '+escapeHtml(s.email)+'</div>'+
+      '<div>'+escapeHtml(s.msme1||'')+'</div>'+
+      (s.msme2 ? '<div>'+escapeHtml(s.msme2)+'</div>' : '')+
+    '</div>'+
+    '<div style="font-family:Georgia,serif;font-style:italic;font-size:32px;color:#3b5bdb;">INVOICE</div>'+
+  '</div>'+
+
+  '<table style="width:260px;float:right;margin-top:8px;border:1px solid #b9c7e6;">'+
+    '<tr style="background:#dce6f7;font-weight:700;"><td style="padding:6px 10px;border:1px solid #b9c7e6;">INVOICE #</td><td style="padding:6px 10px;border:1px solid #b9c7e6;">DATE</td></tr>'+
+    '<tr><td style="padding:6px 10px;border:1px solid #b9c7e6;">'+escapeHtml(d.invoiceNumber)+'</td><td style="padding:6px 10px;border:1px solid #b9c7e6;">'+escapeHtml(d.invoiceDate)+'</td></tr>'+
+  '</table>'+
+  '<div style="clear:both;padding-top:60px;">'+
+    '<div style="font-weight:700;">Buyer (Bill to)</div>'+
+    '<div style="margin-top:4px;line-height:1.5;">'+
+      escapeHtml(b.name)+'<br>'+nl2br(b.address)+
+      (b.gstin?'<br>GSTIN: '+escapeHtml(b.gstin):'')+
+      (b.state?'<br>STATE NAME : '+escapeHtml(b.state)+', Sate Code : '+escapeHtml(b.stateCode):'')+
+      (b.contact?'<br>Contact No '+escapeHtml(b.contact):'')+
+      (b.email?'<br>Email id- '+escapeHtml(b.email):'')+
+    '</div>'+
+  '</div>'+
+
+  '<div style="margin-top:14px;font-weight:700;">'+projLabel+' - <span style="font-style:italic;">'+escapeHtml(d.projectId||'')+'</span></div>'+
+
+  '<table style="width:100%;margin-top:10px;border-collapse:collapse;">'+
+    '<thead><tr style="background:#4f6fbf;color:#fff;">'+
+      '<th style="padding:6px 8px;border:1px solid #35508f;text-align:left;">S.no.</th>'+
+      '<th style="padding:6px 8px;border:1px solid #35508f;text-align:left;">Description</th>'+
+      '<th style="padding:6px 8px;border:1px solid #35508f;text-align:left;">HSN CODE</th>'+
+      '<th style="padding:6px 8px;border:1px solid #35508f;text-align:left;">Qty</th>'+
+      '<th style="padding:6px 8px;border:1px solid #35508f;text-align:left;">Rate</th>'+
+      '<th style="padding:6px 8px;border:1px solid #35508f;text-align:left;">Total Amount</th>'+
+    '</tr></thead>'+
+    '<tbody style="border:1px solid #ccc;">'+rows.replace(/<td>/g,'<td style="padding:5px 8px;border:1px solid #ccc;">').replace(/<td colspan="4">/g,'<td colspan="4" style="border:1px solid #ccc;">')+'</tbody>'+
+  '</table>'+
+
+  '<div style="margin-top:16px;font-weight:700;font-style:italic;text-decoration:underline;">Amount in Words- '+escapeHtml(d.amountWords)+'.</div>'+
+
+  '<div style="margin-top:24px;line-height:1.6;">'+
+    'Beneficiary Name- '+escapeHtml(d.beneficiary||s.name)+'<br>'+
+    'Bank Name- '+escapeHtml(d.bankName)+'<br>'+
+    'Account No- '+escapeHtml(d.accountNumber)+'<br>'+
+    'IFSC Code&nbsp;&nbsp;&nbsp;'+escapeHtml(d.ifsc)+'<br>'+
+    'PAN No&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'+escapeHtml(d.bottomPan||s.pan)+
+  '</div>'+
+  (d.signature? '<div style="margin-top:20px;"><img src="'+d.signature+'" style="max-height:70px;"></div>' : '<div style="margin-top:60px;"></div>')+
+  '</div>';
+}
+
+function renderGstInvoice(d, tpl){
+  const isGst = d.type==='gst';
+  const s=d.seller,b=d.buyer;
+  let itemRows='';
+  d.itemsCalc.forEach((it,i)=>{
+    itemRows += '<tr>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+(i+1)+'</td>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+escapeHtml(it.desc)+'</td>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+escapeHtml(it.hsn)+'</td>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+fmt(it.qty)+'</td>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+escapeHtml(it.unit)+'</td>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+fmt(it.rate)+'</td>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+fmt(it.discount)+'</td>'+
+      '<td style="padding:5px 6px;border:1px solid #ddd;">'+fmt(it.tax)+'</td>'+
+      (isGst? '<td style="padding:5px 6px;border:1px solid #ddd;">'+(it.gst||0)+'%</td><td style="padding:5px 6px;border:1px solid #ddd;">'+fmt(it.cgst)+'</td><td style="padding:5px 6px;border:1px solid #ddd;">'+fmt(it.sgst)+'</td><td style="padding:5px 6px;border:1px solid #ddd;">'+fmt(it.igst)+'</td>' : '')+
+      '<td style="padding:5px 6px;border:1px solid #ddd;font-weight:700;">'+fmt(it.total)+'</td>'+
+    '</tr>';
+  });
+  return '<div style="font-family:'+tpl.font+';">'+
+  '<div style="background:'+tpl.head+';color:#fff;padding:16px 18px;border-radius:4px;display:flex;justify-content:space-between;align-items:center;">'+
+    '<div>'+(d.logo?'<img src="'+d.logo+'" style="max-height:44px;margin-bottom:6px;display:block;">':'')+'<div style="font-size:20px;font-weight:700;">'+escapeHtml(s.name||'Your Company')+'</div></div>'+
+    '<div style="text-align:right;"><div style="font-size:22px;font-weight:700;">'+(isGst?'TAX INVOICE':'INVOICE')+'</div><div style="font-size:12px;">'+escapeHtml(d.invoiceNumber)+'</div></div>'+
+  '</div>'+
+  '<div style="display:flex;justify-content:space-between;margin-top:14px;background:'+tpl.accent+';padding:10px 14px;border-radius:4px;">'+
+    '<div>Invoice Date: <b>'+escapeHtml(d.invoiceDate)+'</b></div><div>Due Date: <b>'+escapeHtml(d.dueDate||'-')+'</b></div><div>Place of Supply: <b>'+escapeHtml(d.placeSupply||'-')+'</b></div><div>Reverse Charge: <b>'+escapeHtml(d.reverseCharge||'No')+'</b></div>'+
+  '</div>'+
+  '<div style="display:flex;gap:20px;margin-top:14px;">'+
+    '<div style="flex:1;"><div style="font-weight:700;color:'+tpl.head+';">Seller</div>'+escapeHtml(s.name)+'<br>'+nl2br(s.address)+(s.gstin?'<br>GSTIN: '+escapeHtml(s.gstin):'')+(s.pan?'<br>PAN: '+escapeHtml(s.pan):'')+'<br>'+escapeHtml(s.email)+' | '+escapeHtml(s.phone)+'</div>'+
+    '<div style="flex:1;"><div style="font-weight:700;color:'+tpl.head+';">Bill To</div>'+escapeHtml(b.name)+'<br>'+nl2br(b.address)+(b.gstin?'<br>GSTIN: '+escapeHtml(b.gstin):'')+(b.pan?'<br>PAN: '+escapeHtml(b.pan):'')+(b.state?'<br>State: '+escapeHtml(b.state)+' ('+escapeHtml(b.stateCode)+')':'')+'</div>'+
+  '</div>'+
+  '<table style="width:100%;margin-top:14px;border-collapse:collapse;font-size:11.5px;">'+
+    '<thead><tr style="background:'+tpl.head+';color:#fff;">'+
+      '<th style="padding:6px;">#</th><th style="padding:6px;">Description</th><th style="padding:6px;">HSN</th><th style="padding:6px;">Qty</th><th style="padding:6px;">Unit</th><th style="padding:6px;">Rate</th><th style="padding:6px;">Disc</th><th style="padding:6px;">Taxable</th>'+
+      (isGst?'<th style="padding:6px;">GST%</th><th style="padding:6px;">CGST</th><th style="padding:6px;">SGST</th><th style="padding:6px;">IGST</th>':'')+
+      '<th style="padding:6px;">Total</th></tr></thead><tbody>'+itemRows+'</tbody>'+
+  '</table>'+
+  '<div style="display:flex;justify-content:flex-end;margin-top:12px;">'+
+    '<table style="min-width:260px;font-size:12.5px;">'+
+      '<tr><td style="padding:4px 10px;">Subtotal</td><td style="padding:4px 10px;text-align:right;">'+fmtMoney(d.subtotal)+'</td></tr>'+
+      '<tr><td style="padding:4px 10px;">Discount</td><td style="padding:4px 10px;text-align:right;">'+fmtMoney(d.discountTotal)+'</td></tr>'+
+      '<tr><td style="padding:4px 10px;">Taxable Amount</td><td style="padding:4px 10px;text-align:right;">'+fmtMoney(d.taxable)+'</td></tr>'+
+      (isGst? ('<tr><td style="padding:4px 10px;">CGST</td><td style="padding:4px 10px;text-align:right;">'+fmtMoney(d.cgst)+'</td></tr>'+
+      '<tr><td style="padding:4px 10px;">SGST</td><td style="padding:4px 10px;text-align:right;">'+fmtMoney(d.sgst)+'</td></tr>'+
+      '<tr><td style="padding:4px 10px;">IGST</td><td style="padding:4px 10px;text-align:right;">'+fmtMoney(d.igst)+'</td></tr>') : '')+
+      '<tr style="background:'+tpl.accent+';font-weight:700;"><td style="padding:6px 10px;">Grand Total</td><td style="padding:6px 10px;text-align:right;">'+fmtMoney(d.grandTotal)+'</td></tr>'+
+    '</table>'+
+  '</div>'+
+  '<div style="margin-top:10px;font-style:italic;">Amount in Words: '+escapeHtml(d.amountWords)+'</div>'+
+  '<div style="display:flex;gap:20px;margin-top:16px;">'+
+    '<div style="flex:1;"><div style="font-weight:700;color:'+tpl.head+';">Bank Details</div>'+escapeHtml(d.bankName)+'<br>A/C: '+escapeHtml(d.accountNumber)+'<br>IFSC: '+escapeHtml(d.ifsc)+'<br>Branch: '+escapeHtml(d.branch)+'</div>'+
+    '<div style="flex:1;">'+(d.notes?'<div><b>Notes:</b> '+nl2br(d.notes)+'</div>':'')+(d.terms?'<div><b>Terms:</b> '+nl2br(d.terms)+'</div>':'')+(d.paymentTerms?'<div><b>Payment Terms:</b> '+nl2br(d.paymentTerms)+'</div>':'')+'</div>'+
+  '</div>'+
+  '<div style="margin-top:40px;text-align:right;">Authorized Signatory</div>'+
+  '</div>';
+}
+
+// ---------- Create Invoice ----------
+el('createInvoiceBtn').addEventListener('click', ()=>{
+  if(!el('f_sellerName').value.trim()){ showMsg('Seller name is required.','err'); return; }
+  if(!el('f_buyerName').value.trim()){ showMsg('Buyer name is required.','err'); return; }
+  if(items.length===0){ showMsg('Add at least one item.','err'); return; }
+  let d = gatherData();
+  d = calcTotals(d);
+  d.id = uid(); d.createdAt = new Date().toISOString();
+  if(d.type==='gst'||d.type==='nongst'){
+    if(manualTplIndex===null){ d.template = getTplCounter()%8; setTplCounter(getTplCounter()+1); }
+    else d.template = manualTplIndex;
+  } else { d.template = null; }
+  d.previewHtml = (d.type==='biometric'||d.type==='frisking') ? renderServiceInvoice(d) : renderGstInvoice(d, TEMPLATES[d.template]);
+
+  history_.push(d); saveHistory(history_);
+  bumpCounter(d.type, (parseInt(d.invoiceNumber.replace(/\D/g,''))||nextCounter(d.type)) );
+  localStorage.setItem(LS_LASTBUYER, JSON.stringify(d.buyer));
+
+  el('previewArea').innerHTML = d.previewHtml;
+  showMsg('Invoice '+d.invoiceNumber+' created successfully.','ok');
+  renderDashboard();
+});
+
+// ---------- Downloads ----------
+el('printBtn').addEventListener('click', ()=> window.print());
+
+el('downloadPdfBtn').addEventListener('click', ()=>{
+  const node = el('previewArea');
+  if(!node.innerHTML.trim()){ showMsg('Create an invoice first.','err'); return; }
+  if(typeof html2canvas==='undefined' || typeof window.jspdf==='undefined'){
+    showMsg('PDF engine could not load (no internet, or this preview blocks external scripts). Please download the file and open it in a normal browser tab (Chrome/Edge), then try again.','err');
+    return;
+  }
+  showMsg('Generating PDF...','ok');
+  html2canvas(node, {scale:2, useCORS:true, allowTaint:true}).then(canvas=>{
+    try{
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF('p','mm','a4');
+      const pageW = 210, pageH = 297;
+      const imgW = pageW;
+      const imgH = canvas.height * imgW / canvas.width;
+      let heightLeft = imgH, position = 0;
+      pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
+      heightLeft -= pageH;
+      while(heightLeft > 0){
+        position = heightLeft - imgH;
+        pdf.addPage();
+        pdf.addImage(imgData,'PNG',0,position,imgW,imgH);
+        heightLeft -= pageH;
+      }
+      try{
+        pdf.save('invoice.pdf');
+      }catch(saveErr){
+        // Fallback for sandboxed/preview environments that block programmatic downloads
+        const blobUrl = pdf.output('bloburl');
+        const w = window.open(blobUrl, '_blank');
+        if(!w){ showMsg('Download blocked by this preview. Please open the file in a real browser tab and try again.','err'); }
+        else { showMsg('PDF opened in a new tab — use its Download/Print button to save.','ok'); }
+      }
+    }catch(err){
+      showMsg('PDF generation failed: '+err.message,'err');
+    }
+  }).catch(err=>{
+    showMsg('Could not capture the invoice for PDF: '+err.message,'err');
+  });
+});
+
+el('downloadExcelBtn').addEventListener('click', ()=>{
+  if(!el('f_invNo')){ showMsg('Create an invoice first.','err'); return; }
+  let d = gatherData(); d = calcTotals(d);
+  const wb = XLSX.utils.book_new();
+  const meta = [['Invoice Number', d.invoiceNumber], ['Invoice Date', d.invoiceDate], ['Type', d.type], ['Buyer', d.buyer.name], ['Grand Total', d.grandTotal], ['Amount in Words', d.amountWords]];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(meta), 'Invoice Info');
+  const isSvc = d.type==='biometric'||d.type==='frisking';
+  const itemHead = isSvc ? ['Description','HSN','Qty','Rate','Total'] : ['Description','HSN','Qty','Unit','Rate','Discount','Taxable','GST%','CGST','SGST','IGST','Total'];
+  const itemAOA = [itemHead];
+  d.itemsCalc.forEach(it=>{
+    if(isSvc) itemAOA.push([it.desc,it.hsn,it.qty,it.rate,it.total]);
+    else itemAOA.push([it.desc,it.hsn,it.qty,it.unit,it.rate,it.discount,it.tax,it.gst||0,it.cgst||0,it.sgst||0,it.igst||0,it.total]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(itemAOA), 'Items');
+  XLSX.writeFile(wb, 'invoice_'+d.invoiceNumber+'.xlsx');
+});
+
+// ---------- Bulk Excel Upload / Template ----------
+const TYPE_LABELS = {biometric:'Biometric', frisking:'Frisking', gst:'GST', nongst:'Non-GST'};
+function normalizeTypeValue(raw){
+  const k = String(raw==null?'':raw).trim().toLowerCase().replace(/[\s_-]+/g,'');
+  if(k==='biometric') return 'biometric';
+  if(k==='frisking') return 'frisking';
+  if(k==='gst') return 'gst';
+  if(k==='nongst') return 'nongst';
+  return null;
+}
+function normHeaderKey(h){ return String(h==null?'':h).toLowerCase().replace(/[^a-z0-9]/g,''); }
+function normalizeRowKeys(row){
+  const o={};
+  Object.keys(row).forEach(k=>{ o[normHeaderKey(k)] = row[k]; });
+  return o;
+}
+function excelValToDateStr(v){
+  if(v==null || v==='') return '';
+  if(v instanceof Date && !isNaN(v)) return v.toISOString().slice(0,10);
+  if(typeof v === 'number'){ const d = new Date(Math.round((v-25569)*86400*1000)); if(!isNaN(d)) return d.toISOString().slice(0,10); }
+  const s = String(v).trim();
+  const d2 = new Date(s);
+  if(!isNaN(d2) && /\d{4}/.test(s)) return d2.toISOString().slice(0,10);
+  return s;
+}
+function excelValToNum(v){ const n = parseFloat(String(v==null?'':v).replace(/,/g,'')); return isNaN(n)?0:n; }
+
+el('downloadTemplateBtn').addEventListener('click', ()=>{
+  const wb = XLSX.utils.book_new();
+  const masterHead = ['Vendor Code','Invoice Type','Invoice No','Invoice Date','Project ID','Vendor Name','Address','Mob No.','E-Mail','MSME Registered','GST No.','PAN','Beneficiary Name','BANK NAME','ACCOUNT NO','IFSC'];
+  const masterRows = [
+    masterHead,
+    ['V001','Frisking','40','2025-12-27','EDUQUITY/CONSTABLEEXE/181225/FRISKING/IIL','MISS MURSHIDA','D/O Sanaulla, Ottupara, Mampatta, Kerala Estate Village, Karuvarakundu, Tharis, Malappuram - 676523','7976649497','ansarikvk66@gmail.com','No','','RYQPS0458M','MISS MURSHIDA','THE FEDERAL BANK LTD','16300100046768','FDRL0001630'],
+    ['V002','Biometric','18','2025-12-15','REIL/4TH-GRD/190925/BIOMETRIC/IIL','KALU RAM MEENA','S/O Kishor Ram Meena, Sukhram Ka Mohalla, Adoli Pin- 301035','8955022886','21krmeena@gmail.com','No','','DOKPM1472R','KALU RAM MEENA','STATE BANK OF INDIA','61115671646','SBIN0031053'],
+    ['V003','GST','GST-0001','2025-02-01','','ABC Private Limited','Mumbai, Maharashtra','9876543210','info@abcpvt.com','No','27AAAAA0000A1Z5','AAAAA0000A','ABC Private Limited','HDFC Bank','123456789012','HDFC0001234']
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(masterRows), 'Invoice Master');
+
+  const itemsHead = ['Vendor Code','Invoice No','Description','HSN/SAC','Qty','Rate','Discount','GST %'];
+  const itemsRows = [
+    itemsHead,
+    ['V001','40','Frisking Services with HHMD (Exam Day)','998525',57,1100,0,0],
+    ['V001','40','Frisking Services with HHMD (Mock Day)','998525',5,200,0,0],
+    ['V002','18','Biometric Services with Device (Exam Day)','998528',38,550,0,0],
+    ['V002','18','Biometric Services with Device (Mock Day)','998528',2,200,0,0],
+    ['V003','GST-0001','Consulting Services','998313',1,50000,0,18]
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(itemsRows), 'Invoice Items');
+
+  const instr = [
+    ['INVOICE BULK UPLOAD - INSTRUCTIONS'],
+    [''],
+    ['1. This file has 2 data sheets: "Invoice Master" and "Invoice Items". Do not rename these sheet names.'],
+    ['2. Vendor Code is the unique code identifying the vendor/seller for the invoice.'],
+    ['3. Vendor Code + Invoice No together uniquely identify one invoice.'],
+    ['4. Multiple item rows can share the same Vendor Code + Invoice No - they will all be added as line items of that one invoice.'],
+    ['5. Invoice Type must be exactly one of: Biometric, Frisking, GST, Non-GST'],
+    ['6. Invoice Date should be a valid date (e.g. 2025-01-15 or 15-01-2025).'],
+    ['7. Vendor Name, Address, Mob No., E-Mail, MSME Registered, GST No., PAN, Beneficiary Name, BANK NAME, ACCOUNT NO and IFSC populate the Seller/Vendor details on the invoice automatically. Leave any of these blank if not applicable - blank fields will simply not appear on the invoice (they are never auto-filled from Settings when an Excel file is used).'],
+    ['8. GST % must be numeric. For Non-GST, Biometric and Frisking invoices, GST % is ignored - use 0.'],
+    ['9. Discount should be 0 when there is no discount for that item.'],
+    ['10. Qty and Rate are required numeric fields for every item row.'],
+    ['11. Project ID is optional but recommended for Biometric/Frisking invoices.'],
+    ['12. Buyer (Bill To) details are NOT part of this template - they continue to auto-fill from the portal\u2019s existing Buyer Details system, exactly as before.'],
+    ['13. Duplicate Vendor Code + Invoice No combinations (already in history or repeated in this file) will be skipped and reported.'],
+    ['14. After uploading, check the on-screen summary for any rows that failed validation.']
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(instr), 'Instructions');
+
+  XLSX.writeFile(wb, 'Invoice_Upload_Template.xlsx');
+});
+
+el('uploadExcelBtn').addEventListener('click', ()=> el('excelFileInput').click());
+el('excelFileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      processBulkWorkbook(wb);
+    }catch(err){
+      renderBulkResult({created:0, skipped:0, errors:['Could not read the Excel file: '+err.message]});
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+});
+
+function findSheet(wb, wantedName){
+  const target = wantedName.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const found = wb.SheetNames.find(n=> n.toLowerCase().replace(/[^a-z0-9]/g,'')===target);
+  return found ? wb.Sheets[found] : null;
+}
+
+function processBulkWorkbook(wb){
+  const errors = [];
+  const masterSheet = findSheet(wb, 'Invoice Master');
+  const itemsSheet = findSheet(wb, 'Invoice Items');
+  if(!masterSheet){ renderBulkResult({created:0, skipped:0, errors:['Sheet "Invoice Master" was not found in the uploaded file.']}); return; }
+  if(!itemsSheet){ renderBulkResult({created:0, skipped:0, errors:['Sheet "Invoice Items" was not found in the uploaded file.']}); return; }
+
+  const masterRowsRaw = XLSX.utils.sheet_to_json(masterSheet, {defval:''});
+  const itemRowsRaw = XLSX.utils.sheet_to_json(itemsSheet, {defval:''});
+  if(masterRowsRaw.length===0){ renderBulkResult({created:0, skipped:0, errors:['"Invoice Master" sheet has no data rows.']}); return; }
+
+  // Group items by Vendor Code + Invoice No
+  const itemsByKey = {};
+  itemRowsRaw.forEach((raw, idx)=>{
+    const r = normalizeRowKeys(raw);
+    const vc = String(r.vendorcode||'').trim();
+    const inv = String(r.invoiceno||'').trim();
+    if(!vc || !inv) return; // will surface as "no items" for the master row if it truly has none
+    const key = vc.toUpperCase()+'::'+inv.toUpperCase();
+    if(!itemsByKey[key]) itemsByKey[key]=[];
+    itemsByKey[key].push({
+      desc: String(r.description||'').trim(),
+      hsn: String(r.hsnsac||'').trim(),
+      qty: excelValToNum(r.qty),
+      rate: excelValToNum(r.rate),
+      discount: excelValToNum(r.discount),
+      gst: excelValToNum(r.gst),
+      unit: 'Nos'
+    });
+  });
+
+  const existingKeys = new Set(history_.filter(h=>h.vendorCode).map(h=> String(h.vendorCode).trim().toUpperCase()+'::'+String(h.invoiceNumber).trim().toUpperCase()));
+  const seenInFile = new Set();
+  let created = 0, skipped = 0;
+
+  masterRowsRaw.forEach((raw, idx)=>{
+    const rowNum = idx+2; // account for header row
+    const r = normalizeRowKeys(raw);
+    const vendorCode = String(r.vendorcode||'').trim();
+    const invTypeRaw = r.invoicetype;
+    const invoiceNo = String(r.invoiceno||'').trim();
+    const invoiceDate = excelValToDateStr(r.invoicedate);
+    const projectId = String(r.projectid||'').trim();
+    // Seller/Vendor fields come strictly from the Excel row - never from Settings, and stay blank if the cell is blank.
+    const vendorName = String(r.vendorname||'').trim();
+    const vendorAddress = String(r.address||'').trim();
+    const vendorMobile = String(r.mobno||'').trim();
+    const vendorEmail = String(r.email||'').trim();
+    const vendorMsme = String(r.msmeregistered||'').trim();
+    const vendorGstNo = String(r.gstno||'').trim();
+    const vendorPan = String(r.pan||'').trim();
+    const vendorBeneficiary = String(r.beneficiaryname||'').trim();
+    const vendorBankName = String(r.bankname||'').trim();
+    const vendorAccountNo = String(r.accountno||'').trim();
+    const vendorIfsc = String(r.ifsc||'').trim();
+    // Buyer details are intentionally NOT read from Excel - existing Buyer auto-fill logic is unchanged.
+    const buyerName = DEFAULT_BUYER.name;
+    const buyerGstin = DEFAULT_BUYER.gstin;
+    const buyerAddress = DEFAULT_BUYER.address;
+
+    if(!vendorCode){ errors.push('Row '+rowNum+' (Invoice Master): Vendor Code is missing.'); return; }
+    if(!invoiceNo){ errors.push('Row '+rowNum+' (Invoice Master): Invoice No is missing.'); return; }
+    const type = normalizeTypeValue(invTypeRaw);
+    if(!type){ errors.push('Row '+rowNum+' (Invoice Master): Invalid Invoice Type "'+invTypeRaw+'". Must be Biometric, Frisking, GST or Non-GST.'); return; }
+    if(!invoiceDate){ errors.push('Row '+rowNum+' (Invoice Master): Invoice Date is missing or invalid.'); return; }
+
+    const key = vendorCode.toUpperCase()+'::'+invoiceNo.toUpperCase();
+    if(existingKeys.has(key)){ errors.push('Row '+rowNum+': Duplicate - Vendor Code "'+vendorCode+'" + Invoice No "'+invoiceNo+'" already exists in Invoice History. Skipped.'); skipped++; return; }
+    if(seenInFile.has(key)){ errors.push('Row '+rowNum+': Duplicate - Vendor Code "'+vendorCode+'" + Invoice No "'+invoiceNo+'" appears more than once in this file. Skipped.'); skipped++; return; }
+
+    const matchedItems = itemsByKey[key];
+    if(!matchedItems || matchedItems.length===0){ errors.push('Row '+rowNum+': No matching rows found in "Invoice Items" for Vendor Code "'+vendorCode+'" + Invoice No "'+invoiceNo+'".'); return; }
+
+    const badItem = matchedItems.find(it=> !it.desc || it.qty<=0 || it.rate<0);
+    if(badItem){ errors.push('Row '+rowNum+' (Vendor '+vendorCode+' / Invoice '+invoiceNo+'): One or more item rows are missing Description or have invalid Qty/Rate.'); return; }
+
+    const isSvc = type==='biometric'||type==='frisking';
+    let d = { type: type, invoiceNumber: invoiceNo, invoiceDate: invoiceDate, vendorCode: vendorCode };
+    d.seller = { name: vendorName, address: vendorAddress, pan: vendorPan, email: vendorEmail, phone: vendorMobile };
+    d.buyer = { name: buyerName, address: buyerAddress, gstin: buyerGstin, state: DEFAULT_BUYER.state, stateCode: DEFAULT_BUYER.stateCode, contact: DEFAULT_BUYER.contact, email: DEFAULT_BUYER.email, pan: DEFAULT_BUYER.pan };
+
+    if(isSvc){
+      d.projectId = projectId;
+      d.categoryLabel = type==='biometric' ? 'Biometric Services with Device' : 'Frisking Services with HHMD';
+      d.seller.msme1 = vendorMsme ? ('MSME Registered - '+vendorMsme) : '';
+      d.seller.msme2 = '';
+      d.beneficiary = vendorBeneficiary;
+      d.bankName = vendorBankName; d.accountNumber = vendorAccountNo; d.ifsc = vendorIfsc; d.bottomPan = vendorPan;
+      d.discount = 0;
+      d.items = matchedItems.map(it=>({desc:it.desc, hsn:it.hsn, qty:it.qty, rate:it.rate}));
+    } else {
+      d.seller.gstin = vendorGstNo;
+      d.buyer.pan = '';
+      d.dueDate=''; d.placeSupply = projectId || ''; d.reverseCharge='No';
+      d.bankName = vendorBankName; d.accountNumber = vendorAccountNo; d.ifsc = vendorIfsc; d.branch = '';
+      d.notes=''; d.terms=''; d.paymentTerms='';
+      if(type==='gst') d.gstMode='auto';
+      d.items = matchedItems.map(it=>({desc:it.desc, hsn:it.hsn, qty:it.qty, unit:it.unit, rate:it.rate, discount:it.discount, gst: type==='gst' ? it.gst : 0}));
+    }
+    d.logo = settings.logo||''; d.signature = settings.signature||'';
+
+    d = calcTotals(d);
+    d.id = uid();
+    const now = new Date();
+    d.createdAt = now.toISOString();
+    d.uploadDate = now.toISOString().slice(0,10);
+    d.uploadTime = now.toTimeString().slice(0,8);
+    d.source = 'Bulk Upload';
+    d.status = 'Bulk Upload';
+    if(type==='gst'||type==='nongst'){ d.template = getTplCounter()%8; setTplCounter(getTplCounter()+1); }
+    else { d.template = null; }
+    d.previewHtml = isSvc ? renderServiceInvoice(d) : renderGstInvoice(d, TEMPLATES[d.template]);
+
+    history_.push(d);
+    bumpCounter(type, (parseInt(String(invoiceNo).replace(/\D/g,''))||nextCounter(type)));
+    existingKeys.add(key); seenInFile.add(key);
+    created++;
+  });
+
+  if(created>0) saveHistory(history_);
+  renderBulkResult({created, skipped, errors});
+  if(created>0){ renderDashboard(); if(document.querySelector('.navbtn[data-view="history"]').classList.contains('active')) renderHistory(); }
+}
+
+function renderBulkResult(res){
+  const box = el('bulkUploadResult');
+  let html = '';
+  if(res.created>0) html += '<div class="msg ok">'+res.created+' invoice(s) created successfully'+(res.skipped?(', '+res.skipped+' duplicate(s) skipped'):'')+'.</div>';
+  else if(res.skipped>0 && res.errors.length===0) html += '<div class="msg err">No new invoices created - '+res.skipped+' duplicate(s) skipped.</div>';
+  if(res.errors && res.errors.length){
+    html += '<div class="msg err"><b>'+res.errors.length+' issue(s) found:</b><ul style="margin:8px 0 0 18px;padding:0;">'+res.errors.map(e=>'<li>'+escapeHtml(e)+'</li>').join('')+'</ul></div>';
+  }
+  if(!html) html = '<div class="msg err">No valid invoices found in the uploaded file.</div>';
+  box.innerHTML = html;
+}
+
+// ---------- Dashboard ----------
+function renderDashboard(){
+  history_ = loadHistory();
+  el('statTotal').textContent = history_.length;
+  el('statGst').textContent = history_.filter(h=>h.type==='gst').length;
+  el('statNonGst').textContent = history_.filter(h=>h.type==='nongst').length;
+  el('statBio').textContent = history_.filter(h=>h.type==='biometric').length;
+  el('statFrisk').textContent = history_.filter(h=>h.type==='frisking').length;
+  const total = history_.reduce((s,h)=>s+(parseFloat(h.grandTotal)||0),0);
+  el('statValue').textContent = fmtMoney(total);
+
+  const recent = history_.slice(-8).reverse();
+  const thead = '<tr><th>Invoice No.</th><th>Date</th><th>Customer</th><th>Type</th><th>Amount</th></tr>';
+  const tbody = recent.map(h=>'<tr><td>'+escapeHtml(h.invoiceNumber)+'</td><td>'+escapeHtml(h.invoiceDate)+'</td><td>'+escapeHtml(h.buyer.name)+'</td><td>'+tagFor(h.type)+'</td><td>'+fmtMoney(h.grandTotal)+'</td></tr>').join('');
+  el('recentTable').innerHTML = '<thead>'+thead+'</thead><tbody>'+tbody+'</tbody>';
+}
+function tagFor(type){
+  const map={gst:'GST',nongst:'Non-GST',biometric:'Biometric',frisking:'Frisking'};
+  return '<span class="tag '+type+'">'+map[type]+'</span>';
+}
+
+function buildInvoicePdfBlob(inv){
+  return new Promise((resolve,reject)=>{
+    if(typeof html2canvas==='undefined' || typeof window.jspdf==='undefined'){ reject(new Error('PDF engine could not load (no internet, or this preview blocks external scripts).')); return; }
+    const tmp = document.createElement('div'); tmp.style.position='fixed'; tmp.style.left='-9999px';
+    tmp.innerHTML = '<div class="a4">'+inv.previewHtml+'</div>'; document.body.appendChild(tmp);
+    html2canvas(tmp.firstChild,{scale:2, useCORS:true, allowTaint:true}).then(canvas=>{
+      try{
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p','mm','a4');
+        const imgW=210, imgH=canvas.height*imgW/canvas.width;
+        pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,imgW,imgH);
+        const blob = pdf.output('blob');
+        document.body.removeChild(tmp);
+        resolve(blob);
+      }catch(err){ document.body.removeChild(tmp); reject(err); }
+    }).catch(err=>{ document.body.removeChild(tmp); reject(err); });
+  });
+}
+
+// ---------- History Table ----------
+let selectedInvoiceIds = new Set();
+function updateBulkSelCount(){ el('bulkSelCount').textContent = selectedInvoiceIds.size+' selected'; }
+function getProjectIdOf(h){ return h.projectId || h.placeSupply || ''; }
+function renderHistory(){
+  history_ = loadHistory();
+  const q = (el('historySearch').value||'').toLowerCase();
+  const fUploadDate = el('filterUploadDate').value;
+  const fVendor = (el('filterVendorCode').value||'').trim().toLowerCase();
+  const fType = el('filterInvoiceType').value;
+  const fInvNo = (el('filterInvoiceNo').value||'').trim().toLowerCase();
+
+  const rows = history_.filter(h=>{
+    if(q && !((h.invoiceNumber+h.buyer.name+h.type).toLowerCase().includes(q))) return false;
+    if(fUploadDate && (h.uploadDate||'')!==fUploadDate) return false;
+    if(fVendor && !String(h.vendorCode||'').toLowerCase().includes(fVendor)) return false;
+    if(fType && h.type!==fType) return false;
+    if(fInvNo && !String(h.invoiceNumber||'').toLowerCase().includes(fInvNo)) return false;
+    return true;
+  }).slice().reverse();
+
+  const thead = '<tr><th><input type="checkbox" id="selectAllRows"></th><th>Upload Date</th><th>Invoice Date</th><th>Vendor Code</th><th>Invoice No.</th><th>Type</th><th>Customer</th><th>Project ID</th><th>Amount</th><th>Status</th><th>Template</th><th>Actions</th></tr>';
+  const tbody = rows.map(h=>{
+    return '<tr>'+
+      '<td><input type="checkbox" class="rowSelect" data-id="'+h.id+'" '+(selectedInvoiceIds.has(h.id)?'checked':'')+'></td>'+
+      '<td>'+escapeHtml(h.uploadDate||'-')+(h.uploadTime?' <span style="color:var(--muted);font-size:11px;">'+escapeHtml(h.uploadTime)+'</span>':'')+'</td>'+
+      '<td>'+escapeHtml(h.invoiceDate)+'</td>'+
+      '<td>'+escapeHtml(h.vendorCode||'-')+'</td>'+
+      '<td>'+escapeHtml(h.invoiceNumber)+'</td><td>'+tagFor(h.type)+'</td><td>'+escapeHtml(h.buyer.name)+'</td>'+
+      '<td>'+escapeHtml(getProjectIdOf(h)||'-')+'</td>'+
+      '<td>'+fmtMoney(h.grandTotal)+'</td>'+
+      '<td>'+escapeHtml(h.status||'Manual')+'</td>'+
+      '<td>'+(h.template!==null && h.template!==undefined ? TEMPLATES[h.template].name : '-')+'</td>'+
+      '<td>'+
+        '<button class="btn btn-outline smallbtn" data-act="view" data-id="'+h.id+'">View</button> '+
+        '<button class="btn btn-outline smallbtn" data-act="dup" data-id="'+h.id+'">Duplicate</button> '+
+        '<button class="btn btn-outline smallbtn" data-act="pdf" data-id="'+h.id+'">PDF</button> '+
+        '<button class="btn btn-danger smallbtn" data-act="del" data-id="'+h.id+'">Delete</button>'+
+      '</td></tr>';
+  }).join('');
+  el('historyTable').innerHTML = '<thead>'+thead+'</thead><tbody>'+tbody+'</tbody>';
+
+  el('historyTable').querySelectorAll('[data-act]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const inv = history_.find(h=>h.id===btn.dataset.id);
+      const act = btn.dataset.act;
+      if(act==='view'){
+        document.querySelector('.navbtn[data-view="create"]').click();
+        el('previewArea').innerHTML = inv.previewHtml;
+      } else if(act==='dup'){
+        const clone = JSON.parse(JSON.stringify(inv));
+        clone.id = uid(); clone.invoiceNumber = clone.invoiceNumber+'-copy'; clone.createdAt = new Date().toISOString();
+        history_.push(clone); saveHistory(history_); renderHistory(); showMsg('Invoice duplicated.','ok');
+      } else if(act==='pdf'){
+        buildInvoicePdfBlob(inv).then(blob=>{
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href=url; a.download='invoice_'+inv.invoiceNumber+'.pdf';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(()=>URL.revokeObjectURL(url),5000);
+        }).catch(err=>{
+          const msg = err && err.message ? err.message : String(err);
+          showMsg('PDF generation failed: '+msg,'err');
+        });
+      } else if(act==='del'){
+        history_ = history_.filter(h=>h.id!==inv.id); saveHistory(history_); selectedInvoiceIds.delete(inv.id); renderHistory(); renderDashboard();
+        showMsg('Invoice deleted.','ok');
+      }
+    });
+  });
+
+  const selectAllCb = el('selectAllRows');
+  if(selectAllCb){
+    selectAllCb.checked = rows.length>0 && rows.every(h=>selectedInvoiceIds.has(h.id));
+    selectAllCb.addEventListener('change', ()=>{
+      rows.forEach(h=>{ if(selectAllCb.checked) selectedInvoiceIds.add(h.id); else selectedInvoiceIds.delete(h.id); });
+      renderHistory();
+    });
+  }
+  el('historyTable').querySelectorAll('.rowSelect').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) selectedInvoiceIds.add(cb.dataset.id); else selectedInvoiceIds.delete(cb.dataset.id);
+      updateBulkSelCount();
+    });
+  });
+  updateBulkSelCount();
+}
+el('historySearch').addEventListener('input', renderHistory);
+el('filterUploadDate').addEventListener('input', renderHistory);
+el('filterVendorCode').addEventListener('input', renderHistory);
+el('filterInvoiceType').addEventListener('change', renderHistory);
+el('filterInvoiceNo').addEventListener('input', renderHistory);
+el('clearFiltersBtn').addEventListener('click', ()=>{
+  el('historySearch').value=''; el('filterUploadDate').value=''; el('filterVendorCode').value=''; el('filterInvoiceType').value=''; el('filterInvoiceNo').value='';
+  renderHistory();
+});
+
+el('bulkDownloadBtn').addEventListener('click', async ()=>{
+  if(selectedInvoiceIds.size===0){ showMsg('Select at least one invoice to download.','err'); return; }
+  if(typeof JSZip==='undefined'){ showMsg('ZIP engine could not load (no internet). Try again after reconnecting.','err'); return; }
+  const ids = Array.from(selectedInvoiceIds);
+  const invoices = history_.filter(h=> ids.includes(h.id));
+  const zip = new JSZip();
+  const progressEl = el('bulkDownloadProgress');
+  const btn = el('bulkDownloadBtn');
+  btn.disabled = true;
+  let done=0, failed=0;
+  progressEl.textContent = 'Preparing 0/'+invoices.length+'...';
+  for(const inv of invoices){
+    try{
+      const blob = await buildInvoicePdfBlob(inv);
+      const fname = 'invoice_'+(inv.vendorCode?inv.vendorCode+'_':'')+String(inv.invoiceNumber).replace(/[\\/:*?"<>|]/g,'-')+'.pdf';
+      zip.file(fname, blob);
+    }catch(err){
+      failed++;
+    }
+    done++;
+    progressEl.textContent = 'Preparing '+done+'/'+invoices.length+'...';
+  }
+  try{
+    const content = await zip.generateAsync({type:'blob'});
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a'); a.href=url; a.download='invoices_'+new Date().toISOString().slice(0,10)+'.zip';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    progressEl.textContent='';
+    showMsg('Downloaded '+(invoices.length-failed)+' invoice(s) as ZIP'+(failed?(', '+failed+' failed'):'')+'.', failed?'err':'ok');
+  }catch(err){
+    progressEl.textContent='';
+    showMsg('Could not build ZIP: '+err.message,'err');
+  }
+  btn.disabled = false;
+});
+
+// ---------- Init ----------
+buildForm();
+renderPreview();
+renderDashboard();
+})();
+</script>
+</body>
+</html>
