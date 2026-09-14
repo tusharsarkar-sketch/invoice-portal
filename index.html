@@ -688,12 +688,36 @@ function gatherData(){
 function calcTotals(d){
   const isSvc = d.type==='biometric'||d.type==='frisking';
   if(isSvc){
-    let sum=0;
-    d.itemsCalc = d.items.map(it=>{ const total=(parseFloat(it.qty)||0)*(parseFloat(it.rate)||0); sum+=total; return Object.assign({},it,{total}); });
-    d.grandTotal = sum - (parseFloat(d.discount)||0);
-    d.amountWords = amountInWords(d.grandTotal);
-    return d;
-  }
+  let subtotal = 0;
+  let discountTotal = 0;
+  let grandTotal = 0;
+
+  d.itemsCalc = d.items.map(it => {
+    const qty = parseFloat(it.qty) || 0;
+    const rate = parseFloat(it.rate) || 0;
+    const discount = parseFloat(it.discount) || 0;
+
+    const gross = qty * rate;
+    const total = Math.max(0, gross - discount);
+
+    subtotal += gross;
+    discountTotal += discount;
+    grandTotal += total;
+
+    return Object.assign({}, it, {
+      gross: gross,
+      discount: discount,
+      total: total
+    });
+  });
+
+  d.subtotal = subtotal;
+  d.discountTotal = discountTotal;
+  d.grandTotal = grandTotal;
+  d.amountWords = amountInWords(grandTotal);
+
+  return d;
+}
   const sellerCode = (d.seller.gstin||'').substring(0,2);
   let intra = true;
   if(d.type==='gst'){
@@ -1114,15 +1138,41 @@ function processBulkWorkbook(wb){
     d.seller = { name: vendorName, address: vendorAddress, pan: vendorPan, email: vendorEmail, phone: vendorMobile };
     d.buyer = { name: buyerName, address: buyerAddress, gstin: buyerGstin, state: DEFAULT_BUYER.state, stateCode: DEFAULT_BUYER.stateCode, contact: DEFAULT_BUYER.contact, email: DEFAULT_BUYER.email, pan: DEFAULT_BUYER.pan };
 
-    if(isSvc){
-      d.projectId = projectId;
-      d.categoryLabel = type==='biometric' ? 'Biometric Services with Device' : 'Frisking Services with HHMD';
-      d.seller.msme1 = vendorMsme ? ('MSME Registered - '+vendorMsme) : '';
-      d.seller.msme2 = '';
-      d.beneficiary = vendorBeneficiary;
-      d.bankName = vendorBankName; d.accountNumber = vendorAccountNo; d.ifsc = vendorIfsc; d.bottomPan = vendorPan;
-      d.discount = 0;
-      d.items = matchedItems.map(it=>({desc:it.desc, hsn:it.hsn, qty:it.qty, rate:it.rate}));
+   if(isSvc){
+  d.projectId = projectId;
+  d.categoryLabel = type==='biometric'
+    ? 'Biometric Services with Device'
+    : 'Frisking Services with HHMD';
+
+  d.seller.msme1 = vendorMsme
+    ? ('MSME Registered - '+vendorMsme)
+    : '';
+
+  d.seller.msme2 = '';
+
+  d.beneficiary = vendorBeneficiary;
+  d.bankName = vendorBankName;
+  d.accountNumber = vendorAccountNo;
+  d.ifsc = vendorIfsc;
+  d.bottomPan = vendorPan;
+
+  // IMPORTANT:
+  // For Biometric / Frisking Excel uploads,
+  // discount comes item-wise from Excel.
+  d.items = matchedItems.map(it=>({
+    desc: it.desc,
+    hsn: it.hsn,
+    qty: it.qty,
+    rate: it.rate,
+    discount: it.discount || 0
+  }));
+
+  // Total discount from all uploaded item rows
+  d.discount = d.items.reduce(
+    (sum, it) => sum + (parseFloat(it.discount) || 0),
+    0
+  );
+}
     } else {
       d.seller.gstin = vendorGstNo;
       d.buyer.pan = '';
