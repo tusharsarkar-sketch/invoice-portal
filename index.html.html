@@ -711,10 +711,6 @@ function calcTotals(d){
     });
   });
 
-  const serviceDiscount = Math.max(0, parseFloat(d.discount) || 0);
-  grandTotal = Math.max(0, grandTotal - serviceDiscount);
-  discountTotal += serviceDiscount;
-
   d.subtotal = subtotal;
   d.discountTotal = discountTotal;
   d.grandTotal = grandTotal;
