@@ -686,144 +686,64 @@ function gatherData(){
 
 // ---------- Calculations ----------
 function calcTotals(d){
-  const isSvc = d.type === 'biometric' || d.type === 'frisking';
-
-  // =========================
-  // BIOMETRIC / FRISKING
-  // =========================
+  const isSvc = d.type==='biometric'||d.type==='frisking';
   if(isSvc){
-
-    let subtotal = 0;
-    let discountTotal = 0;
-    let grandTotal = 0;
-
-    d.itemsCalc = d.items.map(it => {
-
-      const qty = parseFloat(it.qty) || 0;
-      const rate = parseFloat(it.rate) || 0;
-      const discount = parseFloat(it.discount) || 0;
-
-      const gross = qty * rate;
-      const total = Math.max(0, gross - discount);
-
-      subtotal += gross;
-      discountTotal += discount;
-      grandTotal += total;
-
-      return Object.assign({}, it, {
-        gross: gross,
-        discount: discount,
-        total: total
-      });
-    });
-
-    // Single service discount field
-    const serviceDiscount = parseFloat(d.discount) || 0;
-
-    // If service discount is separately entered,
-    // apply it after item-level discounts.
-    if(serviceDiscount > 0){
-      grandTotal = Math.max(0, grandTotal - serviceDiscount);
-      discountTotal += serviceDiscount;
-    }
-
-    d.subtotal = subtotal;
-    d.discountTotal = discountTotal;
-    d.grandTotal = grandTotal;
-    d.amountWords = amountInWords(grandTotal);
-
-    return d;
-  }
-
-  // =========================
-  // GST / NON-GST
-  // =========================
-
-  const sellerCode = (d.seller.gstin || '').substring(0,2);
-
-  let intra = true;
-
-  if(d.type === 'gst'){
-    if(d.gstMode === 'intra'){
-      intra = true;
-    } 
-    else if(d.gstMode === 'inter'){
-      intra = false;
-    } 
-    else {
-      intra =
-        sellerCode && d.buyer.stateCode
-          ? sellerCode === d.buyer.stateCode
-          : true;
-    }
-  }
-
   let subtotal = 0;
-  let discTot = 0;
-  let taxable = 0;
-  let cgst = 0;
-  let sgst = 0;
-  let igst = 0;
-  let grand = 0;
+  let discountTotal = 0;
+  let grandTotal = 0;
 
   d.itemsCalc = d.items.map(it => {
-
     const qty = parseFloat(it.qty) || 0;
     const rate = parseFloat(it.rate) || 0;
-    const disc = parseFloat(it.discount) || 0;
+    const discount = parseFloat(it.discount) || 0;
 
     const gross = qty * rate;
-    const tax = Math.max(0, gross - disc);
-
-    let c = 0;
-    let s = 0;
-    let ig = 0;
-
-    if(d.type === 'gst'){
-
-      const pct = parseFloat(it.gst) || 0;
-
-      if(intra){
-        c = tax * pct / 200;
-        s = tax * pct / 200;
-      } 
-      else {
-        ig = tax * pct / 100;
-      }
-    }
-
-    const total = tax + c + s + ig;
+    const total = Math.max(0, gross - discount);
 
     subtotal += gross;
-    discTot += disc;
-    taxable += tax;
-    cgst += c;
-    sgst += s;
-    igst += ig;
-    grand += total;
+    discountTotal += discount;
+    grandTotal += total;
 
     return Object.assign({}, it, {
       gross: gross,
-      tax: tax,
-      cgst: c,
-      sgst: s,
-      igst: ig,
+      discount: discount,
       total: total
     });
   });
 
+  const serviceDiscount = Math.max(0, parseFloat(d.discount) || 0);
+  grandTotal = Math.max(0, grandTotal - serviceDiscount);
+  discountTotal += serviceDiscount;
+
   d.subtotal = subtotal;
-  d.discountTotal = discTot;
-  d.taxable = taxable;
-  d.cgst = cgst;
-  d.sgst = sgst;
-  d.igst = igst;
-  d.grandTotal = grand;
-  d.intra = intra;
-  d.amountWords = amountInWords(grand);
+  d.discountTotal = discountTotal;
+  d.grandTotal = grandTotal;
+  d.amountWords = amountInWords(grandTotal);
 
   return d;
 }
+  const sellerCode = (d.seller.gstin||'').substring(0,2);
+  let intra = true;
+  if(d.type==='gst'){
+    if(d.gstMode==='intra') intra=true; else if(d.gstMode==='inter') intra=false; else intra = sellerCode && d.buyer.stateCode ? (sellerCode===d.buyer.stateCode) : true;
+  }
+  let subtotal=0, discTot=0, taxable=0, cgst=0, sgst=0, igst=0, grand=0;
+  d.itemsCalc = d.items.map(it=>{
+    const qty=parseFloat(it.qty)||0, rate=parseFloat(it.rate)||0, disc=parseFloat(it.discount)||0;
+    const gross = qty*rate;
+    const tax = gross - disc;
+    let c=0,s=0,ig=0;
+    if(d.type==='gst'){
+      const pct = parseFloat(it.gst)||0;
+      if(intra){ c = tax*pct/200; s = tax*pct/200; } else { ig = tax*pct/100; }
+    }
+    const total = tax + c + s + ig;
+    subtotal+=gross; discTot+=disc; taxable+=tax; cgst+=c; sgst+=s; igst+=ig; grand+=total;
+    return Object.assign({},it,{gross,tax,cgst:c,sgst:s,igst:ig,total});
+  });
+  d.subtotal=subtotal; d.discountTotal=discTot; d.taxable=taxable; d.cgst=cgst; d.sgst=sgst; d.igst=igst; d.grandTotal=grand; d.intra=intra;
+  d.amountWords = amountInWords(grand);
+  return d;
 }
 
 // ---------- Render Preview ----------
@@ -1256,7 +1176,6 @@ function processBulkWorkbook(wb){
     (sum, it) => sum + (parseFloat(it.discount) || 0),
     0
   );
-}
     } else {
       d.seller.gstin = vendorGstNo;
       d.buyer.pan = '';
